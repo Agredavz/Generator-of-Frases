@@ -69,3 +69,4 @@ st.markdown(f"""
 
 st.divider()
 st.info("Cada frase es generada por una red neuronal en tiempo real. Nunca verás la misma dos veces.")
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
