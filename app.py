@@ -1,70 +1,71 @@
 import streamlit as st
 import random
-import json
-import os
+from groq import Groq
 
-# --- LÓGICA DEL GENERADOR ---
-class GeneradorFrases:
-    def __init__(self, archivo="biblioteca_frases.json"):
-        self.archivo = archivo
-        self.biblioteca = self.cargar_datos()
+# --- CONFIGURACIÓN DE LA PÁGINA ---
+st.set_page_config(page_title="Inspiración Infinita IA", page_icon="🎨")
 
-    def cargar_datos(self):
-        if os.path.exists(self.archivo):
-            try:
-                with open(self.archivo, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except:
-                pass
-        return {
-            "Pensadores": ["Solo sé que no sé nada. - Sócrates", "La duda es el principio de la sabiduría. - Aristóteles"],
-            "Libros": ["El hombre nace libre. - Rousseau", "Caminante, no hay camino... - Machado"],
-            "Canciones": ["Everything will be okay. - Lennon", "Vivir es lo más peligroso que tiene la vida. - Alejandro Sanz"],
-            "Propias": ["La curiosidad es el código del futuro."]
-        }
+# Cliente de IA (Usando el Secret de Streamlit)
+try:
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+except:
+    st.error("⚠️ Falta la API Key en los Secrets de Streamlit.")
 
-    def generar(self, categoria):
-        if categoria in self.biblioteca:
-            return random.choice(self.biblioteca[categoria])
-        return "Categoría no encontrada."
+# Diccionario de Colores y Estilos
+estilos = {
+    "Filósofos": {"color": "#1E3A8A", "bg": "#DBEAFE", "icon": "🏛️"}, # Azul
+    "Libros": {"color": "#065F46", "bg": "#D1FAE5", "icon": "📖"},    # Verde
+    "Canciones": {"color": "#991B1B", "bg": "#FEE2E2", "icon": "🎸"}, # Rojo
+    "Propias": {"color": "#92400E", "bg": "#FEF3C7", "icon": "💡"},   # Ámbar
+    "Destino (Azar)": {"color": "#5B21B6", "bg": "#EDE9FE", "icon": "🎲"} # Púrpura
+}
 
-# --- INTERFAZ WEB ---
-st.set_page_config(page_title="Inspiración Automática", page_icon="✨")
-gen = GeneradorFrases()
+def generar_frase_ia(categoria):
+    prompt = f"Genera una frase única, profunda y original de la categoría: {categoria}. Que no sea famosa, inventa algo nuevo con ese estilo. Solo devuelve la frase y el autor ficticio."
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.8, # Más creatividad
+        )
+        return completion.choices[0].message.content
+    except:
+        return "El universo está en silencio ahora mismo. (Error de conexión)"
 
-st.title("✨ Generador de Frases")
+# --- INTERFAZ ---
+st.title("🚀 Generador de Sabiduría Infinita")
 
-# Sección 1: Generar Frase
-st.header("🔮 Obtener Inspiración")
+if 'frase_actual' not in st.session_state:
+    st.session_state.frase_actual = "Haz clic para despertar a la IA..."
+if 'cat_actual' not in st.session_state:
+    st.session_state.cat_actual = "Destino (Azar)"
 
-# Usamos columnas para que se vea ordenado
 col1, col2 = st.columns([2, 1])
 
 with col2:
-    categoria_sel = st.selectbox("Elige una categoría", list(gen.biblioteca.keys()))
-    # El botón ahora forzará el cambio
-    boton_generar = st.button("Generar nueva frase")
+    st.subheader("Configuración")
+    categoria = st.selectbox("Elige la fuente:", list(estilos.keys()))
+    if st.button("✨ GENERAR NUEVA FRASE"):
+        with st.spinner('La IA está pensando...'):
+            st.session_state.frase_actual = generar_frase_ia(categoria)
+            st.session_state.cat_actual = categoria
 
-with col1:
-    # Si se pulsa el botón o si ya había una frase guardada
-    if boton_generar:
-        frase_suerte = gen.generar(categoria_sel)
-        # Guardamos la frase en la memoria de la sesión para que no desaparezca
-        st.session_state['frase_actual'] = frase_suerte
-    
-    if 'frase_actual' in st.session_state:
-        st.info("Tu frase es:")
-        st.subheader(f"\"{st.session_state['frase_actual']}\"")
-    else:
-        st.write("Selecciona una categoría y pulsa el botón.")
+# Aplicar Colores Dinámicos
+estilo = estilos[st.session_state.cat_actual]
+st.markdown(f"""
+    <div style="
+        padding: 30px; 
+        border-radius: 20px; 
+        background-color: {estilo['bg']}; 
+        border-left: 10px solid {estilo['color']};
+        color: {estilo['color']};
+        font-family: 'Georgia', serif;
+        font-size: 24px;
+        box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    ">
+        {estilo['icon']} <i>"{st.session_state.frase_actual}"</i>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.divider()
-
-# Sección 2: Añadir (El resto del código se mantiene igual...)
-with st.expander("✍️ Añadir una nueva frase a la colección"):
-    nueva_cat = st.radio("Categoría destino:", list(gen.biblioteca.keys()), horizontal=True)
-    nueva_frase = st.text_area("Escribe la frase:")
-    if st.button("Guardar frase"):
-        if nueva_frase.strip():
-            # Aquí podrías implementar la lógica de guardado si lo deseas
-            st.success("¡Frase guardada con éxito!")
+st.info("Cada frase es generada por una red neuronal en tiempo real. Nunca verás la misma dos veces.")
