@@ -1,24 +1,17 @@
 import streamlit as st
-import random
 from groq import Groq
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Inspiración Infinita IA", page_icon="🎨")
 
-# 1. INTENTAR CONECTAR CON LA LLAVE
+# Conectar con la llave secreta
 try:
-    # Buscamos la llave en los Secrets de Streamlit
-    if "GROQ_API_KEY" in st.secrets:
-        api_key = st.secrets["GROQ_API_KEY"]
-        client = Groq(api_key=api_key)
-    else:
-        st.error("❌ No se encontró la llave 'GROQ_API_KEY' en los Secrets.")
-        st.stop()
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
-    st.error(f"⚠️ Error de configuración: {e}")
+    st.error("Configura la GROQ_API_KEY en los Secrets de Streamlit.")
     st.stop()
 
-# Diccionario de Colores
+# Estilos de colores
 estilos = {
     "Filósofos": {"color": "#1E3A8A", "bg": "#DBEAFE", "icon": "🏛️"},
     "Libros": {"color": "#065F46", "bg": "#D1FAE5", "icon": "📖"},
@@ -28,40 +21,63 @@ estilos = {
 }
 
 def generar_frase_ia(categoria):
-    prompt = f"Genera una frase corta, profunda y original de la categoría: {categoria}. Solo la frase y el autor."
+    # Prompt optimizado para evitar errores 400
+    mensaje_prompt = f"Genera una frase corta y profunda de la categoría {categoria}. Solo responde con la frase y el autor."
+    
     try:
+        # Usamos el modelo 'llama-3.3-70b-versatile' que es el más actualizado y estable
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Eres un generador de frases sabias y creativas."},
+                {"role": "user", "content": mensaje_prompt}
+            ],
             temperature=0.7,
+            max_tokens=100
         )
         return completion.choices[0].message.content
     except Exception as e:
-        return f"La IA está descansando. Error: {str(e)[:50]}..."
+        # Si falla el modelo anterior, intentamos con el modelo pequeño
+        try:
+            completion = client.chat.completions.create(
+                model="llama3-8b-8192",
+                messages=[{"role": "user", "content": mensaje_prompt}]
+            )
+            return completion.choices[0].message.content
+        except:
+            return f"Hubo un pequeño error técnico. Intenta de nuevo. (Detalle: {str(e)[:30]})"
 
 # --- INTERFAZ ---
-st.title("🚀 Generador de Sabiduría Infinita")
+st.title("🚀 Sabiduría Infinita con IA")
 
 if 'frase_actual' not in st.session_state:
-    st.session_state.frase_actual = "Haz clic para despertar a la IA..."
+    st.session_state.frase_actual = "Haz clic para generar tu primera frase única."
 if 'cat_actual' not in st.session_state:
     st.session_state.cat_actual = "Destino (Azar)"
 
 col1, col2 = st.columns([2, 1])
 
 with col2:
-    st.subheader("Configuración")
-    categoria = st.selectbox("Elige la fuente:", list(estilos.keys()))
-    if st.button("✨ GENERAR NUEVA FRASE"):
-        with st.spinner('Pensando...'):
+    st.subheader("Opciones")
+    categoria = st.selectbox("Elige el estilo:", list(estilos.keys()))
+    if st.button("✨ GENERAR FRASE"):
+        with st.spinner('Consultando a la IA...'):
             st.session_state.frase_actual = generar_frase_ia(categoria)
             st.session_state.cat_actual = categoria
+        st.rerun()
 
-# Cuadro con Color Dinámico
+# Mostrar la frase con su color correspondiente
 estilo = estilos[st.session_state.cat_actual]
 st.markdown(f"""
-    <div style="padding: 30px; border-radius: 20px; background-color: {estilo['bg']}; 
-    border-left: 10px solid {estilo['color']}; color: {estilo['color']}; font-size: 24px;">
-        {estilo['icon']} <i>"{st.session_state.frase_actual}"</i>
+    <div style="
+        padding: 30px; 
+        border-radius: 20px; 
+        background-color: {estilo['bg']}; 
+        border-left: 10px solid {estilo['color']};
+        color: {estilo['color']};
+        font-size: 24px;
+        font-family: 'serif';
+    ">
+        {estilo['icon']} <i>{st.session_state.frase_actual}</i>
     </div>
     """, unsafe_allow_html=True)
